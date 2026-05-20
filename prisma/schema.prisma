@@ -1,0 +1,89 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      String   @default("owner")
+  createdAt DateTime @default(now())
+  stores    Store[]
+}
+
+model Store {
+  id        String   @id @default(uuid())
+  ownerId   String
+  name      String
+  logo      String?
+  plan      String   @default("free")
+  createdAt DateTime @default(now())
+  owner     User     @relation(fields: [ownerId], references: [id])
+  products  Product[]
+  orders    Order[]
+  customers Customer[]
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  storeId     String
+  name        String
+  description String?
+  price       Float
+  stock       Int      @default(0)
+  category    String?
+  image       String?
+  createdAt   DateTime @default(now())
+  store       Store    @relation(fields: [storeId], references: [id])
+  orderItems  OrderItem[]
+}
+
+model Customer {
+  id        String   @id @default(uuid())
+  storeId   String
+  name      String
+  phone     String?
+  email     String?
+  createdAt DateTime @default(now())
+  store     Store    @relation(fields: [storeId], references: [id])
+  orders    Order[]
+}
+
+model Order {
+  id            String      @id @default(uuid())
+  storeId       String
+  customerId    String
+  total         Float
+  status        String      @default("pending")
+  paymentStatus String      @default("unpaid")
+  createdAt     DateTime    @default(now())
+  store         Store       @relation(fields: [storeId], references: [id])
+  customer      Customer    @relation(fields: [customerId], references: [id])
+  items         OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Subscription {
+  id        String    @id @default(uuid())
+  storeId   String    @unique
+  plan      String    @default("free")
+  status    String    @default("active")
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+}
