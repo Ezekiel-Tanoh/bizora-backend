@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException, ConflictException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
+import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    private prisma: PrismaService,
   ) {}
 
   async register(name: string, email: string, password: string) {
@@ -24,7 +26,19 @@ export class AuthService {
       password: hashedPassword,
     });
 
-    const token = this.jwtService.sign({ sub: user.id, email: user.email });
+    const store = await this.prisma.store.create({
+      data: {
+        ownerId: user.id,
+        name: `Boutique de ${name}`,
+        plan: 'free',
+      },
+    });
+
+    const token = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      storeId: store.id,
+    });
 
     return {
       message: 'Compte créé avec succès',
@@ -33,6 +47,7 @@ export class AuthService {
         id: user.id,
         name: user.name,
         email: user.email,
+        storeId: store.id,
       },
     };
   }
@@ -48,7 +63,15 @@ export class AuthService {
       throw new UnauthorizedException('Email ou mot de passe incorrect');
     }
 
-    const token = this.jwtService.sign({ sub: user.id, email: user.email });
+    const store = await this.prisma.store.findFirst({
+      where: { ownerId: user.id },
+    });
+
+    const token = this.jwtService.sign({
+      sub: user.id,
+      email: user.email,
+      storeId: store?.id,
+    });
 
     return {
       message: 'Connexion réussie',
@@ -57,6 +80,7 @@ export class AuthService {
         id: user.id,
         name: user.name,
         email: user.email,
+        storeId: store?.id,
       },
     };
   }
