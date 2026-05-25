@@ -60,7 +60,6 @@ export class PaymentsService {
       })
 
       const result = await response.json()
-console.log('PayDunya response:', JSON.stringify(result))
 
       if (result.response_code === '00') {
         return {
