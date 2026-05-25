@@ -32,6 +32,7 @@ export class PaymentsService {
     try {
       const baseUrl = this.getBaseUrl()
       const headers = this.getHeaders()
+
       const payload = {
         invoice: {
           total_amount: data.montant,
