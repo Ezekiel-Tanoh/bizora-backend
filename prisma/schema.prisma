@@ -87,3 +87,16 @@ model Subscription {
   expiresAt DateTime?
   createdAt DateTime  @default(now())
 }
+model Paiement {
+  id          String   @id @default(cuid())
+  token       String   @unique
+  montant     Float
+  description String
+  clientNom   String
+  clientTel   String
+  statut      String   @default("pending")
+  methode     String?
+  commandeId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
