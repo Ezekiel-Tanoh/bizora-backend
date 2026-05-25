@@ -1,18 +1,23 @@
 import { Injectable } from '@nestjs/common';
-import * as paydunya from 'paydunya';
 
 @Injectable()
 export class PaymentsService {
-  constructor() {
-    const setup = new paydunya.Setup({
-      masterKey: process.env.PAYDUNYA_MASTER_KEY,
-      privateKey: process.env.PAYDUNYA_PRIVATE_KEY,
-      publicKey: process.env.PAYDUNYA_PUBLIC_KEY,
-      token: process.env.PAYDUNYA_TOKEN,
-      mode: process.env.PAYDUNYA_MODE || 'test',
-    });
 
-    paydunya.Setup.setConfig(setup);
+  private getHeaders() {
+    return {
+      'Content-Type': 'application/json',
+      'PAYDUNYA-MASTER-KEY': process.env.PAYDUNYA_MASTER_KEY,
+      'PAYDUNYA-PUBLIC-KEY': process.env.PAYDUNYA_PUBLIC_KEY,
+      'PAYDUNYA-PRIVATE-KEY': process.env.PAYDUNYA_PRIVATE_KEY,
+      'PAYDUNYA-TOKEN': process.env.PAYDUNYA_TOKEN,
+    }
+  }
+
+  private getBaseUrl() {
+    const mode = process.env.PAYDUNYA_MODE || 'test'
+    return mode === 'live'
+      ? 'https://app.paydunya.com/api/v1'
+      : 'https://app.paydunya.com/sandbox-api/v1'
   }
 
   async createPayment(data: {
@@ -25,52 +30,77 @@ export class PaymentsService {
     cancelUrl: string
   }) {
     try {
-      const invoice = new paydunya.CheckoutInvoice();
+      const baseUrl = this.getBaseUrl()
+      const headers = this.getHeaders()
 
-      invoice.addItem("Paiement Bizora", 1, data.montant, data.montant, data.description)
+      const payload = {
+        invoice: {
+          total_amount: data.montant,
+          description: data.description,
+        },
+        store: {
+          name: "Bizora",
+          tagline: "Le commerce intelligent",
+          postal_address: "Abidjan, Côte d'Ivoire",
+        },
+        actions: {
+          cancel_url: data.cancelUrl,
+          return_url: data.returnUrl,
+          callback_url: `${process.env.BACKEND_URL}/payments/callback`,
+        },
+        custom_data: {
+          client_nom: data.clientNom,
+          client_telephone: data.clientTelephone,
+        },
+      }
 
-      invoice.totalAmount = data.montant
-      invoice.description = data.description
+      const response = await fetch(`${baseUrl}/checkout-invoice/create`, {
+        method: 'POST',
+        headers: headers as any,
+        body: JSON.stringify(payload),
+      })
 
-      invoice.addCustomData("client_nom", data.clientNom)
-      invoice.addCustomData("client_telephone", data.clientTelephone)
+      const result = await response.json()
 
-      invoice.cancelUrl = data.cancelUrl
-      invoice.returnUrl = data.returnUrl
-      invoice.callbackUrl = `${process.env.BACKEND_URL}/payments/callback`
-
-      const response = await invoice.create()
-
-      if (response) {
+      if (result.response_code === '00') {
         return {
           success: true,
-          paymentUrl: invoice.url,
-          token: invoice.token,
+          paymentUrl: result.response_text,
+          token: result.token,
         }
       }
 
       return {
         success: false,
-        message: "Erreur lors de la création du paiement",
+        message: result.response_text || "Erreur PayDunya",
       }
-    } catch (error) {
-      throw new Error("Erreur PayDunya: " + error.message)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error("Erreur PayDunya: " + message)
     }
   }
 
   async verifyPayment(token: string) {
     try {
-      const invoice = new paydunya.CheckoutInvoice()
-      await invoice.confirm(token)
+      const baseUrl = this.getBaseUrl()
+      const headers = this.getHeaders()
+
+      const response = await fetch(`${baseUrl}/checkout-invoice/confirm/${token}`, {
+        method: 'GET',
+        headers: headers as any,
+      })
+
+      const result = await response.json()
 
       return {
         success: true,
-        status: invoice.status,
-        montant: invoice.totalAmount,
-        token: invoice.token,
+        status: result.status,
+        montant: result.invoice?.total_amount,
+        token: result.token,
       }
-    } catch (error) {
-      throw new Error("Erreur vérification: " + error.message)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      throw new Error("Erreur vérification: " + message)
     }
   }
 }
