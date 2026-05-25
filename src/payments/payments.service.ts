@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class PaymentsService {
+  constructor(private prisma: PrismaService) {}
 
   private getHeaders() {
     return {
@@ -28,6 +30,7 @@ export class PaymentsService {
     clientTelephone: string
     returnUrl: string
     cancelUrl: string
+    commandeId?: string
   }) {
     try {
       const baseUrl = this.getBaseUrl()
@@ -63,6 +66,19 @@ export class PaymentsService {
       const result = await response.json()
 
       if (result.response_code === '00') {
+        await this.prisma.paiement.create({
+          data: {
+            token: result.token,
+            montant: data.montant,
+            description: data.description,
+            clientNom: data.clientNom,
+            clientTel: data.clientTelephone,
+            statut: 'pending',
+            commandeId: data.commandeId || null,
+            updatedAt: new Date(),
+          }
+        })
+
         return {
           success: true,
           paymentUrl: result.response_text,
@@ -91,6 +107,11 @@ export class PaymentsService {
       })
 
       const result = await response.json()
+
+      await this.prisma.paiement.updateMany({
+        where: { token },
+        data: { statut: result.status, updatedAt: new Date() }
+      })
 
       return {
         success: true,
