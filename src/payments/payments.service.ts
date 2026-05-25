@@ -32,7 +32,7 @@ export class PaymentsService {
     try {
       const baseUrl = this.getBaseUrl()
       const headers = this.getHeaders()
-
+      console.log('MASTER KEY:', process.env.PAYDUNYA_MASTER_KEY?.substring(0, 10))
       const payload = {
         invoice: {
           total_amount: data.montant,
